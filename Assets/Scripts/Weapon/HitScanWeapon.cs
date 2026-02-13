@@ -76,13 +76,14 @@ public class HitScanWeapon : MonoBehaviour
                 damageable.TakeDamage(damage);
             }
 
-            // 피격 이펙트 생성 및 2초 후 삭제
-            if (hitEffectPrefab != null)
+            //GameObject go = Instantiate(hitEffectPrefab, hit.point, Quaternion.LookRotation(hit.normal));
+            GameObject go1 = PoolManager.Instance.SpawnFromPool("HitEffect_Everywhere", hit.point, Quaternion.LookRotation(hit.normal));
+            if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Enemy"))
             {
-                //GameObject go = Instantiate(hitEffectPrefab, hit.point, Quaternion.LookRotation(hit.normal));
-                GameObject go = PoolManager.Instance.SpawnFromPool("HitEffect", hit.point, Quaternion.LookRotation(hit.normal));
-                //Destroy(go, 2.0f);
+                GameObject go2 = PoolManager.Instance.SpawnFromPool("HitEffect_OnEnemy", hit.point, Quaternion.LookRotation(hit.normal));
+                go2.GetComponent<ParticleSystem>().Play();
             }
+            //Destroy(go, 2.0f);
         }
     }
 
