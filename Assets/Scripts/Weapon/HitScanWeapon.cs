@@ -26,6 +26,8 @@ public class HitScanWeapon : MonoBehaviour
 
     private void Start()
     {
+        damage = GameManager.Instance.currentDifficultyData.playerAttack;
+
         // 시작 시 탄약 풀충전 및 이벤트 발생
         currentAmmo = maxAmmo;
         OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
@@ -85,6 +87,13 @@ public class HitScanWeapon : MonoBehaviour
             }
             //Destroy(go, 2.0f);
         }
+    }
+
+    public void GetAmmo(int amount)
+    {
+        currentAmmo += amount;
+        Mathf.Clamp(currentAmmo, 0, maxAmmo);
+        OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
     }
 
     void OnDrawGizmos()

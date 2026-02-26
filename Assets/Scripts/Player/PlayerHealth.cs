@@ -14,6 +14,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        maxHealth = GameManager.Instance.currentDifficultyData.playerHP;
+
         currentHealth = maxHealth;
 
         if (OnHealthChanged != null)

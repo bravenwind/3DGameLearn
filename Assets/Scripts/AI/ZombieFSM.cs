@@ -14,74 +14,68 @@ public enum EnemyState
 public class ZombieFSM : MonoBehaviour, IDamageable
 {
     [SerializeField]
-    [Tooltip("현재 상태")]
-    private EnemyState currentState;
+    [Tooltip("현재 상태 (인스펙터 확인용 Enum)")]
+    private EnemyState currentStateType;
 
-    [SerializeField]
-    private float viewDistance = 15.0f;
+    [SerializeField] private float viewDistance = 15.0f;
+    [SerializeField] private float viewAngle = 60.0f;
+    [SerializeField] private float hearingDistance = 5.0f;
+    [SerializeField] private LayerMask obstacleLayerMask;
+    [SerializeField] private float attackRange = 5.0f;
 
-    [SerializeField]
-    [Tooltip("시야각")]
-    private float viewAngle = 60.0f;
+    [SerializeField] private Transform[] wayPoints;
+    [SerializeField] private int currentWaypointIndex = 0;
 
-    [SerializeField]
-    [Tooltip("청각 거리")]
-    private float hearingDistance = 5.0f;
-
-    [SerializeField]
-    [Tooltip("장애물 레이어")]
-    private LayerMask obstacleLayerMask;
-
-    [SerializeField]
-    [Tooltip("공격 가능 거리")]
-    private float attackRange = 5.0f;
-
-    [SerializeField]
-    [Tooltip("웨이포인트 배열")]
-    private Transform[] wayPoints;
-
-    [SerializeField]
-    [Tooltip("현재 목표 지점 인덱스")]
-    private int currentWaypointIndex = 0;
-
-    [SerializeField]
-    [Tooltip("플레이어 Transform")]
-    private Transform targetPlayer;
-
-    [SerializeField]
-    [Tooltip("플레이어 FPSMovement")]
-    private FPSMovement playerMovement;
-
-    [SerializeField]
-    [Tooltip("적 눈 Transform")]
-    private Transform eyeTransform;
-
-    [SerializeField]
-    [Tooltip("적 NavMeshAgent")]
-    private NavMeshAgent agent;
-
-    [SerializeField]
-    [Tooltip("적 Animator")]
-    private Animator animator;
+    [SerializeField] private Transform targetPlayer;
+    [SerializeField] private FPSMovement playerMovement;
+    [SerializeField] private Transform eyeTransform;
+    [SerializeField] private NavMeshAgent agent;
+    [SerializeField] private Animator animator;
 
     [Header("최근 추가된 전투 설정")]
-    [SerializeField, Tooltip("공속 (attackRate초에 1번)")] private float attackRate = 1.0f;
-    [SerializeField, Tooltip("공격 데미지")] private float attackDamage = 10.0f;
+    [SerializeField] private float attackRate = 1.0f;
+    [SerializeField] private float attackDamage = 10.0f;
     [SerializeField] private float maxHealth = 100.0f;
     [SerializeField] private float currentHealth = 0.0f;
     [SerializeField] private float lastAttackTime = 0.0f;
     [SerializeField] private RagdollController ragdollController;
 
-    private float idleTimer = 0.0f;
-    private float idleDuration = 2.0f;
-
-    private float suspiciousTimer = 0.0f;
-    private float suspiciousDuration = 3.0f;
+    [Header("타이머 설정 (인스펙터 조절용)")]
+    [SerializeField] private float idleDuration = 2.0f;
+    [SerializeField] private float suspiciousDuration = 3.0f;
 
     private Vector3 playerPositionMemory;
 
+    // --- 상태 패턴용 인스턴스 및 프로퍼티 ---
+    public EnemyBaseState CurrentState { get; private set; }
+
+    public EnemyIdleState StateIdle { get; private set; }
+    public EnemyPatrolState StatePatrol { get; private set; }
+    public EnemyChaseState StateChase { get; private set; }
+    public EnemyAttackState StateAttack { get; private set; }
+    public EnemySuspiciousState StateSuspicious { get; private set; }
+    public EnemyDeadState StateDead { get; private set; }
+
+    // 외부 상태 클래스들이 본체의 데이터에 접근할 수 있도록 열어둔 프로퍼티(Property)
+    public NavMeshAgent Agent => agent;
+    public Animator Animator => animator;
+    public Transform TargetPlayer => targetPlayer;
+    public Transform[] WayPoints => wayPoints;
+    public float ViewDistance => viewDistance;
+    public float AttackRange => attackRange;
+    public float AttackRate => attackRate;
+    public float IdleDuration => idleDuration;
+    public float SuspiciousDuration => suspiciousDuration;
+
+    public int CurrentWaypointIndex { get => currentWaypointIndex; set => currentWaypointIndex = value; }
+    public Vector3 PlayerPositionMemory { get => playerPositionMemory; set => playerPositionMemory = value; }
+    public float LastAttackTime { get => lastAttackTime; set => lastAttackTime = value; }
+
     private void Start()
     {
+        maxHealth = GameManager.Instance.currentDifficultyData.enemyHP;
+        attackDamage = GameManager.Instance.currentDifficultyData.enemyAttack;
+
         GameObject go = GameObject.FindGameObjectWithTag("Player");
         if (go != null)
         {
@@ -90,170 +84,49 @@ public class ZombieFSM : MonoBehaviour, IDamageable
         }
 
         currentHealth = maxHealth;
-        currentState = EnemyState.Idle;
+
+        // 상태 인스턴스 초기화
+        StateIdle = new EnemyIdleState();
+        StatePatrol = new EnemyPatrolState();
+        StateChase = new EnemyChaseState();
+        StateAttack = new EnemyAttackState();
+        StateSuspicious = new EnemySuspiciousState();
+        StateDead = new EnemyDeadState();
+
+        // 초기 상태 진입
+        ChangeState(StateIdle);
     }
 
     private void Update()
     {
-        if (currentState == EnemyState.Dead) return;
-
-        switch (currentState)
-        {
-            case EnemyState.Idle: Update_Idle(); break;
-            case EnemyState.Patrol: Update_Patrol(); break;
-            case EnemyState.Chase: Update_Chase(); break;
-            case EnemyState.Attack: Update_Attack(); break;
-            case EnemyState.Suspicious: Update_Suspicious(); break;
-        }
-
-        CheckTransitions();
+        CurrentState?.Update(this);
     }
 
-    void ChangeState(EnemyState newState)
+    public void ChangeState(EnemyBaseState newState)
     {
-        if (currentState == newState) return;
+        if (CurrentState == newState) return;
 
-        currentState = newState;
+        // 기존 상태의 Exit 로직 실행
+        CurrentState?.Exit(this);
 
-        switch (currentState)
-        {
-            case EnemyState.Idle:
-                idleTimer = 0.0f;
-                agent.ResetPath();
-                animator.SetBool("IsMoving", false);
-                break;
+        // 상태 교체
+        CurrentState = newState;
 
-            case EnemyState.Patrol:
-                if (wayPoints.Length > 0)
-                {
-                    agent.SetDestination(wayPoints[currentWaypointIndex].position);
-                }
-                animator.SetBool("IsMoving", true);
-                break;
+        // 인스펙터 디버깅용 Enum 동기화
+        if (newState == StateIdle) currentStateType = EnemyState.Idle;
+        else if (newState == StatePatrol) currentStateType = EnemyState.Patrol;
+        else if (newState == StateChase) currentStateType = EnemyState.Chase;
+        else if (newState == StateAttack) currentStateType = EnemyState.Attack;
+        else if (newState == StateSuspicious) currentStateType = EnemyState.Suspicious;
+        else if (newState == StateDead) currentStateType = EnemyState.Dead;
 
-            case EnemyState.Chase:
-                animator.SetBool("IsMoving", true);
-                break;
-
-            case EnemyState.Attack:
-                // 공격 상태 진입 시 이동 멈춤은 Update_Attack에서 처리
-                break;
-
-            case EnemyState.Suspicious:
-                suspiciousTimer = 0.0f;
-                agent.SetDestination(playerPositionMemory);
-                animator.SetBool("IsMoving", true);
-                break;
-
-            case EnemyState.Dead:
-                Die();
-                break;
-        }
+        // 새로운 상태의 Enter 로직 실행
+        CurrentState.Enter(this);
     }
 
-    void Update_Idle()
-    {
-        idleTimer += Time.deltaTime;
-        if (idleTimer >= idleDuration)
-        {
-            ChangeState(EnemyState.Patrol);
-        }
-    }
+    // --- 이하 공통 기능 (각 상태 클래스에서 호출해서 사용) ---
 
-    void Update_Patrol()
-    {
-        if (wayPoints.Length == 0) return;
-
-        if (!agent.pathPending && agent.remainingDistance < 0.5f)
-        {
-            currentWaypointIndex = (currentWaypointIndex + 1) % wayPoints.Length;
-            ChangeState(EnemyState.Idle);
-        }
-    }
-
-    void Update_Chase()
-    {
-        if (agent.enabled && targetPlayer != null)
-        {
-            agent.isStopped = false;
-            agent.SetDestination(targetPlayer.position);
-        }
-    }
-
-    void Update_Attack()
-    {
-        if (agent.enabled) agent.isStopped = true;
-
-        if (targetPlayer != null)
-        {
-            Vector3 targetPosition = new Vector3(targetPlayer.position.x, transform.position.y, targetPlayer.position.z);
-            transform.LookAt(targetPosition);
-
-            if (Time.time >= lastAttackTime + attackRate)
-            {
-                lastAttackTime = Time.time;
-                animator.SetTrigger("Attack");
-
-                IDamageable playerHealth = targetPlayer.GetComponent<IDamageable>();
-                if (playerHealth != null)
-                {
-                    playerHealth.TakeDamage(attackDamage);
-                }
-            }
-        }
-    }
-
-    void Update_Suspicious()
-    {
-        if (!agent.pathPending && agent.remainingDistance < 0.5f)
-        {
-            animator.SetBool("IsMoving", false);
-            suspiciousTimer += Time.deltaTime;
-            if (suspiciousTimer >= suspiciousDuration)
-            {
-                ChangeState(EnemyState.Patrol);
-            }
-        }
-    }
-
-    void CheckTransitions()
-    {
-        if (targetPlayer == null || currentState == EnemyState.Dead) return;
-
-        float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.position);
-
-        if (currentState == EnemyState.Chase)
-        {
-            if (distanceToPlayer <= attackRange)
-            {
-                ChangeState(EnemyState.Attack);
-            }
-            else if (distanceToPlayer > viewDistance)
-            {
-                ChangeState(EnemyState.Patrol);
-            }
-        }
-        else if (currentState == EnemyState.Attack)
-        {
-            if (distanceToPlayer > attackRange)
-            {
-                ChangeState(EnemyState.Chase);
-            }
-        }
-        else
-        {
-            if (DetectPlayer_Sight(distanceToPlayer))
-            {
-                ChangeState(EnemyState.Chase);
-            }
-            else if (DetectPlayer_Audio(distanceToPlayer))
-            {
-                ChangeState(EnemyState.Suspicious);
-            }
-        }
-    }
-
-    bool DetectPlayer_Audio(float distance)
+    public bool DetectPlayer_Audio(float distance)
     {
         if (distance <= hearingDistance)
         {
@@ -266,7 +139,7 @@ public class ZombieFSM : MonoBehaviour, IDamageable
         return false;
     }
 
-    bool DetectPlayer_Sight(float distance)
+    public bool DetectPlayer_Sight(float distance)
     {
         if (distance <= viewDistance)
         {
@@ -286,22 +159,23 @@ public class ZombieFSM : MonoBehaviour, IDamageable
 
     public void TakeDamage(float damageAmount)
     {
-        if (currentState == EnemyState.Dead) return;
+        if (CurrentState == StateDead) return;
 
         currentHealth -= damageAmount;
 
-        if (currentState != EnemyState.Chase && currentState != EnemyState.Attack)
+        // 데미지를 받으면 추적 상태로 전환
+        if (CurrentState != StateChase && CurrentState != StateAttack)
         {
-            ChangeState(EnemyState.Chase);
+            ChangeState(StateChase);
         }
 
         if (currentHealth <= 0)
         {
-            ChangeState(EnemyState.Dead);
+            ChangeState(StateDead);
         }
     }
 
-    void Die()
+    public void Die()
     {
         agent.isStopped = true;
         agent.enabled = false;
@@ -329,5 +203,18 @@ public class ZombieFSM : MonoBehaviour, IDamageable
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+    }
+
+    public void OnAnimationHit()
+    {
+        float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.position);
+        if (distanceToPlayer < attackRange)
+        {
+            IDamageable playerHealth = targetPlayer.GetComponent<IDamageable>();
+            if (playerHealth != null)
+            {
+                playerHealth.TakeDamage(attackDamage);
+            }
+        }
     }
 }

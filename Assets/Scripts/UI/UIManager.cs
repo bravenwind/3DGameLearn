@@ -15,6 +15,9 @@ public class UIManager : MonoBehaviour
     private HitScanWeapon hitScanWeapon;
 
     [SerializeField]
+    private DamageVignette damageVignette;
+
+    [SerializeField]
     private TMP_Text currentAmmoText;
 
     [SerializeField]
@@ -25,6 +28,7 @@ public class UIManager : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.OnHealthChanged += UpdateHealthUI;
+            playerHealth.OnHealthChanged += damageVignette.UpdateVignette;
         }
         
         if (hitScanWeapon != null)
@@ -38,6 +42,7 @@ public class UIManager : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.OnHealthChanged -= UpdateHealthUI;
+            playerHealth.OnHealthChanged -= damageVignette.UpdateVignette;
         }
 
         if (hitScanWeapon != null)
