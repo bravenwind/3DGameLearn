@@ -1,10 +1,15 @@
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.Timeline;
+using System.Collections;
 
 public class RagdollController : MonoBehaviour
 {
     [SerializeField]
     private Animator animator;
+
+    [SerializeField]
+    private PlayerHealth playerHealth;
 
     private List<Rigidbody> ragdollRigidbodies = new List<Rigidbody>(); 
 
@@ -24,6 +29,11 @@ public class RagdollController : MonoBehaviour
         }
 
         DIsableRagdoll();
+
+        if (playerHealth != null) 
+        {
+            playerHealth.OnDeath += EnableRagdoll;
+        }
     }
 
     public void DIsableRagdoll()
@@ -50,6 +60,12 @@ public class RagdollController : MonoBehaviour
         {
             animator.enabled = false;
         }
+
+        if (playerHealth != null)
+        {
+            playerHealth.OnDeath -= EnableRagdoll;
+            StartCoroutine(Co_DisableRagdoll());
+        }
     }
 
     private void Update()
@@ -57,6 +73,16 @@ public class RagdollController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.R))
         {
             EnableRagdoll();
+        }
+    }
+
+    IEnumerator Co_DisableRagdoll()
+    {
+        yield return new WaitForSecondsRealtime(1.0f);
+
+        for (int i = 0; i < ragdollRigidbodies.Count; i++)
+        {
+            ragdollRigidbodies[i].isKinematic = true;
         }
     }
 }

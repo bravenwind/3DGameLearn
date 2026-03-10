@@ -7,7 +7,7 @@ public class Magazine : MonoBehaviour, IInteractable
 
     public string GetInteractText()
     {
-        return "[F] Åº¾à »ç¿ë " + ammoAmount.ToString() + " HP";
+        return "[F] Åº¾à ÃæÀü " + ammoAmount.ToString() + " °³";
     }
 
     public void Interact(GameObject player)

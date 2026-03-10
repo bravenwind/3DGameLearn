@@ -1,10 +1,29 @@
 using UnityEngine;
+using Unity.Cinemachine;
 using System;
 
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
     [SerializeField]
     private float maxHealth = 100.0f;
+
+    [SerializeField]
+    private CinemachineCamera deathCam;
+
+    [SerializeField]
+    private LayerMask deathCamLayerMask;
+
+    [SerializeField]
+    private FPSCameraController controller;
+
+    [SerializeField]
+    private FPSMovement movement;
+
+    [SerializeField]
+    private HitScanWeapon weapon;
+
+    [SerializeField]
+    private GameObject uiPanel;
 
     private float currentHealth;
 
@@ -67,11 +86,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         currentHealth = 0;
 
         OnDeath?.Invoke();
-    }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
+        controller.enabled = false;
+        movement.enabled = false;
+        weapon.enabled = false;
+        uiPanel.SetActive(false);
+
+        Camera.main.cullingMask = deathCamLayerMask;
+
+        deathCam.Priority = 10;
+
     }
 }

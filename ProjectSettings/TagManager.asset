@@ -12,10 +12,11 @@ TagManager:
   - ExplosiveBarrel
   - Target
   - GasTank
-  - Metal (Static)
-  - Wood (Static)
-  - Dirt (Static)
   - Wood
+  - CinemachineTarget
+  - Rock
+  - Glass
+  - Enemy
   layers:
   - Default
   - TransparentFX
@@ -28,16 +29,16 @@ TagManager:
   - Wall
   - First Person View
   - Character
-  - Post Processing
-  - Post Processing Weapon
-  - Post Processing Scope
-  - Invisible Wall
+  - Wood
+  - Metal
+  - Rock
+  - Glass
   - Projectile
   - Enemy
   - InteractableItem
   - Minimap
-  - 
-  - 
+  - EnemyHitBox
+  - Explosive
   - 
   - 
   - 

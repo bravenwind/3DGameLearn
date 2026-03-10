@@ -24,6 +24,12 @@ public class FPSMovement : MonoBehaviour
     private CharacterController controller;
 
     [SerializeField]
+    private Animator animator;
+
+    [SerializeField]
+    private PlaySFXAudio sfx;
+
+    [SerializeField]
     private float runningMultiplier = 2.0f;
 
     private Vector3 verticalVelocity;
@@ -34,7 +40,14 @@ public class FPSMovement : MonoBehaviour
 
     private void Update()
     {
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundCheckDistance, groundMask);
+        RaycastHit hit;
+        isGrounded = Physics.Raycast(groundCheck.position, Vector3.down, out hit, groundCheckDistance, groundMask);
+
+        sfx.SetIsGrounded(isGrounded);
+        if (isGrounded)
+        {
+            CheckLayer(hit);
+        }
 
         // [수정 1] 움직임 체크 위치 변경 (이동 로직 후, 혹은 Move 합친 후 확인)
         // 하지만 CharacterController.velocity는 물리 연산 후 갱신되므로 
@@ -92,6 +105,9 @@ public class FPSMovement : MonoBehaviour
         // 수직 속도(중력)는 제외하고 수평 속도만으로 판단해야 정확합니다.
         Vector3 horizontalVelocity = new Vector3(controller.velocity.x, 0, controller.velocity.z);
         isMoving = horizontalVelocity.sqrMagnitude > 0.1f;
+
+        
+        animator.SetBool("isMoving", isMoving);
     }
 
     /// <summary>
@@ -101,5 +117,12 @@ public class FPSMovement : MonoBehaviour
     public bool IsMoving()
     {
         return isMoving;
+    }
+
+    void CheckLayer(RaycastHit hit)
+    {
+        string hitTag = hit.transform.gameObject.tag;
+
+        sfx.SetCurrentWalkAudio(hitTag);
     }
 }

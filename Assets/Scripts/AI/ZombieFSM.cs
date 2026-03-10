@@ -75,6 +75,7 @@ public class ZombieFSM : MonoBehaviour, IDamageable
     {
         maxHealth = GameManager.Instance.currentDifficultyData.enemyHP;
         attackDamage = GameManager.Instance.currentDifficultyData.enemyAttack;
+        ragdollController = GetComponent<RagdollController>();
 
         GameObject go = GameObject.FindGameObjectWithTag("Player");
         if (go != null)
@@ -124,8 +125,6 @@ public class ZombieFSM : MonoBehaviour, IDamageable
         CurrentState.Enter(this);
     }
 
-    // --- 이하 공통 기능 (각 상태 클래스에서 호출해서 사용) ---
-
     public bool DetectPlayer_Audio(float distance)
     {
         if (distance <= hearingDistance)
@@ -148,7 +147,7 @@ public class ZombieFSM : MonoBehaviour, IDamageable
 
             if (angle <= viewAngle * 0.5f)
             {
-                if (!Physics.Raycast(eyeTransform.position, dirToTarget, viewDistance, obstacleLayerMask))
+                if (!Physics.Raycast(eyeTransform.position, dirToTarget, distance, obstacleLayerMask))
                 {
                     return true;
                 }
@@ -163,15 +162,13 @@ public class ZombieFSM : MonoBehaviour, IDamageable
 
         currentHealth -= damageAmount;
 
-        // 데미지를 받으면 추적 상태로 전환
-        if (CurrentState != StateChase && CurrentState != StateAttack)
-        {
-            ChangeState(StateChase);
-        }
-
         if (currentHealth <= 0)
         {
             ChangeState(StateDead);
+        }
+        else if (CurrentState != StateChase && CurrentState != StateAttack)
+        {
+            ChangeState(StateChase);
         }
     }
 
@@ -184,8 +181,11 @@ public class ZombieFSM : MonoBehaviour, IDamageable
 
         if (ragdollController != null)
         {
+            Debug.Log("랙돌 활성화");
             ragdollController.EnableRagdoll();
         }
+
+        MissionEventBus.PublishEnemyKilled();
 
         Destroy(gameObject, 5.0f);
     }
@@ -208,13 +208,37 @@ public class ZombieFSM : MonoBehaviour, IDamageable
     public void OnAnimationHit()
     {
         float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.position);
-        if (distanceToPlayer < attackRange)
+
+        // [수정됨] 실제 공격이 적중하는 범위는 상태 진입 범위(attackRange)보다 약간(20%) 넉넉하게 주어 회피 판정을 부드럽게 만듭니다.
+        if (distanceToPlayer <= attackRange * 1.2f)
         {
             IDamageable playerHealth = targetPlayer.GetComponent<IDamageable>();
             if (playerHealth != null)
             {
                 playerHealth.TakeDamage(attackDamage);
             }
+        }
+    }
+
+    public void DetectStoneAudio(Vector3 pos)
+    {
+        playerPositionMemory = pos;
+        ChangeState(StateSuspicious);
+    }
+
+    public void TakePartialDamage(float damageAmount, bool isLegHit)
+    {
+        if (CurrentState == StateDead)
+        {
+            return;
+        }
+
+        TakeDamage(damageAmount);
+
+        if (currentHealth > 0 && isLegHit && agent.enabled)
+        {
+            agent.speed *= 0.5f;
+            animator.speed *= 0.5f;
         }
     }
 }
