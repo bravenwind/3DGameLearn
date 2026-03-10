@@ -101,6 +101,11 @@ public class ZombieFSM : MonoBehaviour, IDamageable
     private void Update()
     {
         CurrentState?.Update(this);
+        if (DayNightController.Instance.GetCurrentHour() > 0.0f && DayNightController.Instance.GetCurrentHour() < 4.0f)
+        {
+            SetSight(viewAngle * 0.5f, ViewDistance * 0.5f);
+            agent.speed *= 0.75f;
+        }
     }
 
     public void ChangeState(EnemyBaseState newState)
@@ -240,5 +245,11 @@ public class ZombieFSM : MonoBehaviour, IDamageable
             agent.speed *= 0.5f;
             animator.speed *= 0.5f;
         }
+    }
+
+    public void SetSight(float angle, float distance)
+    {
+        viewAngle = angle;
+        viewDistance = distance;
     }
 }
